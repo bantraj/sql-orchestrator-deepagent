@@ -1,24 +1,21 @@
-import os
-import requests
-import pandas as pd
-
-PHOENIX_BASE_URL = os.getenv("PHOENIX_BASE_URL")
-SPACE_ID = os.getenv("PHOENIX_SPACE_ID")
-API_KEY = os.getenv("PHOENIX_API_KEY")
-
-HEADERS = {
+headers = {
     "Authorization": f"Bearer {API_KEY}",
     "Content-Type": "application/json",
 }
 
-GRAPHQL_QUERY = """
-query GetSpans($spaceId: ID!, $limit: Int!) {
-  spans(
-    spaceId: $spaceId
-    first: $limit
+graphql_query = """
+query TraceSlideOverQuery(
+  $modelId: ID!
+  $dataset: ModelDatasetInput!
+  $maxNumRecords: Int!
+) {
+  traceSlideOverQuery(
+    modelId: $modelId
+    dataset: $dataset
+    maxNumRecords: $maxNumRecords
   ) {
     edges {
-      node {
+      span {
         traceId
         spanId
         parentSpanId
@@ -26,7 +23,6 @@ query GetSpans($spaceId: ID!, $limit: Int!) {
         startTime
         endTime
         latencyMs
-        statusCode
         attributes
       }
     }
@@ -34,50 +30,41 @@ query GetSpans($spaceId: ID!, $limit: Int!) {
 }
 """
 
-def fetch_spans(limit=1000):
-    url = f"{PHOENIX_BASE_URL}/graphql"
 
-    payload = {
-        "query": GRAPHQL_QUERY,
-        "variables": {
-            "spaceId": SPACE_ID,
-            "limit": limit
+variables = {
+    "modelId": "W9kZMw6MTENjNMWTNk6ODpRw",
+    "dataset": {
+        "startTime": "2026-01-17T18:30:00.000Z",
+        "endTime": "2026-01-21T18:29:59.999Z",
+        "environmentName": "tracing",
+        "filters": [],
+        "queryFilter": {
+            "context.trace_id": "0add94cc2bdb571ab140e806de5abf1"
         }
-    }
+    },
+    "maxNumRecords": 6000
+}
 
-    response = requests.post(url, headers=HEADERS, json=payload)
-    response.raise_for_status()
-
-    return response.json()
-
-
-def flatten_spans(response):
-    rows = []
-
-    edges = response["data"]["spans"]["edges"]
-    for edge in edges:
-        span = edge["node"]
-        rows.append({
-            "trace_id": span["traceId"],
-            "span_id": span["spanId"],
-            "parent_span_id": span["parentSpanId"],
-            "name": span["name"],
-            "start_time": span["startTime"],
-            "end_time": span["endTime"],
-            "latency_ms": span["latencyMs"],
-            "status": span["statusCode"],
-            "attributes": span["attributes"],
-        })
-
-    return rows
-
-def export_to_csv(rows, file_name="phoenix_traces.csv"):
-    df = pd.DataFrame(rows)
-    df.to_csv(file_name, index=False)
-    print(f"✅ Exported {len(df)} spans to {file_name}")
+payload = {
+    "operationName": "TraceSlideOverQuery",
+    "query": graphql_query,
+    "variables": variables
+}
 
 
-if __name__ == "__main__":
-    response = fetch_spans(limit=1000)
-    rows = flatten_spans(response)
-    export_to_csv(rows)
+import requests
+
+response = requests.post(
+    f"{PHOENIX_BASE_URL}/graphql",
+    headers=headers,
+    json=payload,
+    timeout=60
+)
+
+print(response.status_code)
+print(response.text)
+response.raise_for_status()
+
+
+import json
+print(json.dumps(payload, indent=2))
