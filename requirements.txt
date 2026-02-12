@@ -1,3 +1,9 @@
 deepagents==0.3.5
 langchain-openai==1.1.7
 python-dotenv==1.2.1
+pandas
+apache-airflow
+apache-airflow-providers-google
+google-cloud-bigquery
+google-cloud-dataproc
+google-cloud-storage
